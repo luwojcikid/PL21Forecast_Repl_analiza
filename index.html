@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="pl">
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width,initial-scale=1" name="viewport"/>
+  <title>
+   Analiza forecastu
+  </title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js">
+  </script>
+  <style>
+   
+:root {
+    font-family: Arial, sans-serif;
+    color: #15253e;
+    background: #f3f6fa
+}
+
+* {
+    box-sizing: border-box
+}
+
+body {
+    margin: 0
+}
+
+header {
+    background: #102b4e;
+    color: white;
+    padding: 28px max(24px, calc((100% - 1500px)/2))
+}
+
+header h1 {
+    margin: 0 0 8px;
+    font-size: 28px
+}
+
+header p {
+    margin: 0;
+    color: #c7d6e8
+}
+
+main {
+    max-width: 1550px;
+    margin: auto;
+    padding: 24px
+}
+
+.card {
+    background: white;
+    border: 1px solid #dce5ef;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 18px;
+    box-shadow: 0 4px 18px #2036560a
+}
+
+.files,
+.filters,
+.stats {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: end
+}
+
+.field {
+    flex: 1;
+    min-width: 190px
+}
+
+label {
+    display: block;
+    font-size: 13px;
+    font-weight: bold;
+    margin-bottom: 7px;
+    color: #475b72
+}
+
+input,
+select,
+button {
+    font: inherit;
+    border: 1px solid #cbd7e5;
+    border-radius: 7px;
+    padding: 10px;
+    background: #fff;
+    max-width: 100%
+}
+
+input:not([type=file]),
+select {
+    width: 100%
+}
+
+button {
+    background: #1462d2;
+    color: white;
+    border: 0;
+    cursor: pointer;
+    font-weight: bold;
+    padding: 11px 17px
+}
+
+button.secondary {
+    background: #eaf1fb;
+    color: #194e91
+}
+
+button:disabled {
+    opacity: .5;
+    cursor: not-allowed
+}
+
+.note {
+    font-size: 13px;
+    color: #53667c;
+    line-height: 1.5
+}
+
+.alert {
+    color: #a0490c
+}
+
+.stat {
+    flex: 1;
+    min-width: 145px;
+    padding: 16px;
+    background: #f4f8fd;
+    border-radius: 9px
+}
+
+.stat strong {
+    display: block;
+    font-size: 23px;
+    margin-top: 6px
+}
+
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px
+}
+
+.tablewrap {
+    overflow: auto;
+    max-height: 65vh;
+    border: 1px solid #dce5ef;
+    border-radius: 8px
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    white-space: nowrap
+}
+
+th,
+td {
+    border-bottom: 1px solid #e6edf4;
+    padding: 10px;
+    text-align: left;
+    vertical-align: top
+}
+
+th {
+    position: sticky;
+    top: 0;
+    background: #eaf1f9;
+    color: #233d5d;
+    z-index: 1
+}
+
+tr:hover td {
+    background: #f7faff
+}
+
+.warn {
+    color: #a0490c;
+    font-weight: bold
+}
+
+.good {
+    color: #17724a
+}
+
+.supplier {
+    line-height: 1.6;
+    min-width: 190px;
+    white-space: normal
+}
+
+.paginator {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 14px
+}
+
+.paginator button {
+    padding: 8px 12px
+}
+
+#status {
+    min-height: 20px
+}
+
+.fileinput {
+    width: 100%
+}
+
+.wide {
+    min-width: 235px
+}
+
+@media(max-width:700px) {
+    main {
+        padding: 12px
+    }
+
+    header {
+        padding: 22px
+    }
+
+    h1 {
+        font-size: 23px !important
+    }
+}
+
+  </style>
+ </head>
+ <body>
+  <header>
+   <h1>
+    Analiza forecastu
+   </h1>
+   <p>
+    Prognoza klienta połączona z danymi magazynowymi
+   </p>
+  </header>
+  <main>
+   <section class="card">
+    <div class="files">
+     <div class="field">
+      <label for="forecast">
+       1. Forecast klienta (.xlsx)
+      </label>
+      <input accept=".xlsx,.xls" class="fileinput" id="forecast" type="file"/>
+     </div>
+     <div class="field">
+      <label for="wsad">
+       2. Stan magazynu — Wsad (.xlsx)
+      </label>
+      <input accept=".xlsx,.xls" class="fileinput" id="wsad" type="file"/>
+     </div>
+     <button id="run">
+      Analizuj pliki
+     </button>
+    </div>
+    <p class="note">
+     Dane są przetwarzane w przeglądarce. Numery artykułów są łączone jako tekst. Prognoza pochodzi z kolumn B, C i E.
+    </p>
+    <div class="files">
+     <button class="secondary" id="templateForecast" type="button">
+      Pobierz wzór forecastu
+     </button>
+     <button class="secondary" id="templateStock" type="button">
+      Pobierz wzór stanu magazynu
+     </button>
+    </div>
+    <p class="note">
+     Wzory zawierają przykładowe dane. Przed importem zastąp je własnymi danymi, zachowując układ kolumn.
+    </p>
+    <div aria-live="polite" class="note" id="status">
+    </div>
+   </section>
+   <section class="card">
+    <div class="stats">
+     <div class="stat">
+      Wiersze raportu
+      <strong id="kRows">
+       0
+      </strong>
+     </div>
+     <div class="stat">
+      Artykuły
+      <strong id="kArt">
+       0
+      </strong>
+     </div>
+     <div class="stat">
+      Prognoza szt.
+      <strong id="kForecast">
+       0
+      </strong>
+     </div>
+     <div class="stat">
+      Stan poniżej prognozy
+      <strong id="kLow">
+       0
+      </strong>
+     </div>
+     <div class="stat">
+      Brak we Wsadzie
+      <strong id="kMissing">
+       0
+      </strong>
+     </div>
+    </div>
+   </section>
+   <section class="card">
+    <div class="filters">
+     <div class="field wide">
+      <label for="search">
+       Artykuł lub opis
+      </label>
+      <input id="search" placeholder="Wpisz numer lub nazwę"/>
+     </div>
+     <div class="field">
+      <label for="week">
+       Tydzień ISO
+      </label>
+      <select id="week">
+       <option value="">
+        Wszystkie tygodnie
+       </option>
+      </select>
+     </div>
+     <div class="field">
+      <label for="month">
+       Miesiąc
+      </label>
+      <select id="month">
+       <option value="">
+        Wszystkie miesiące
+       </option>
+      </select>
+     </div>
+     <div class="field">
+      <label for="zone">
+       Pick Zone
+      </label>
+      <select id="zone">
+       <option value="">
+        Wszystkie strefy
+       </option>
+      </select>
+     </div>
+     <div class="field">
+      <label for="repl">
+       Ustawienie REPL
+      </label>
+      <select id="repl">
+       <option value="">
+        Wszystkie ustawienia
+       </option>
+      </select>
+     </div>
+     <div class="field">
+      <label for="state">
+       Stan
+      </label>
+      <select id="state">
+       <option value="">
+        Wszystkie
+       </option>
+       <option value="low">
+        Stan poniżej forecastu
+       </option>
+       <option value="ok">
+        Stan wystarczający
+       </option>
+       <option value="missing">
+        Brak we Wsadzie
+       </option>
+      </select>
+     </div>
+     <button class="secondary" id="reset">
+      Wyczyść filtry
+     </button>
+    </div>
+   </section>
+   <section class="card">
+    <div class="toolbar">
+     <div>
+      <h2>
+       Raport tygodniowy
+      </h2>
+      <p class="note">
+       Jedna linia to artykuł i tydzień ISO. Udziały procentowe są liczone względem całego forecastu w okresie. Rankingi TOP oraz podsumowania Pareto znajdziesz w eksporcie do Excela. Pareto pokazuje TOP 10, 20 i 50 oraz liczbę artykułów potrzebną do osiągnięcia 80% forecastu całego okresu.
+      </p>
+     </div>
+     <button disabled="" id="export">
+      Eksportuj do Excel
+     </button>
+    </div>
+    <div class="tablewrap">
+     <table>
+      <thead id="head">
+      </thead>
+      <tbody id="body">
+       <tr>
+        <td>
+         Wybierz oba pliki i kliknij „Analizuj pliki”.
+        </td>
+       </tr>
+      </tbody>
+     </table>
+    </div>
+    <div class="paginator">
+     <button class="secondary" id="prev">
+      Poprzednia
+     </button>
+     <span id="pageInfo">
+      Strona 0 z 0
+     </span>
+     <button class="secondary" id="next">
+      Następna
+     </button>
+    </div>
+    <p class="note">
+     Stan to bieżąca suma dla wszystkich Revision. Porównanie dotyczy każdego tygodnia oddzielnie i nie uwzględnia przyszłych dostaw ani narastającego zużycia. Średnia palet to średnia z wartości forecast ÷ sztuki na palecie dla poszczególnych dostawców, z dokładnością do 4 miejsc. Udział procentowy jest liczony względem całej prognozy w danym tygodniu lub miesiącu. Status „Planowana dostawa” oznacza wyłącznie prognozowany niedobór, nie potwierdzenie zamówienia.
+    </p>
+   </section>
+  </main>
+  <script>
+   
+'use strict';
+const $ = id => document.getElementById(id),
+    fmt = n => new Intl.NumberFormat('pl-PL', {
+        maximumFractionDigits: 4
+    }).format(n),
+    esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    } [c]));
+let records = [],
+    monthParts = [],
+    filtered = [],
+    page = 1;
+const perPage = 100;
+const cols = ['Artykuł', 'Rok ISO', 'Tydzień ISO', 'Miesiąc', 'Daty forecastu', 'Forecast tygodniowy szt.', 'Udział tygodniowy %', 'Forecast miesięczny szt.', 'Udział miesięczny %', 'Stan łączny szt.', 'Status stanu', 'Liczba dostawców', 'Revision', 'Descr 1', 'Descr 2', 'Pick MHA', 'BufferMHA', 'Pick Zone', 'Buff Zone', 'Ustawienie REPL', 'Szt. na palecie', 'Średnia palet'];
+$('head').innerHTML = '<tr>' + cols.map(x => '<th>' + x + '</th>').join('') + '</tr>';
+
+function norm(x) {
+    let s = String(x ?? '').trim();
+    return /^\d+$/.test(s) ? s.replace(/^0+(?=\d)/, '') : s.toUpperCase()
+}
+
+function num(x) {
+    if (typeof x === 'number') return Number.isFinite(x) ? x : null;
+    let s = String(x ?? '').trim().replace(/\s/g, '').replace(',', '.');
+    return s !== '' && Number.isFinite(Number(s)) ? Number(s) : null
+}
+
+function excelDate(v) {
+    if (v instanceof Date && !isNaN(v)) return new Date(Date.UTC(v.getFullYear(), v.getMonth(), v.getDate()));
+    if (typeof v === 'number') {
+        const d = XLSX.SSF.parse_date_code(v);
+        return d ? new Date(Date.UTC(d.y, d.m - 1, d.d)) : null
+    }
+    let s = String(v ?? '').trim(),
+        m = s.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
+    if (m) return new Date(Date.UTC(+m[3], +m[2] - 1, +m[1]));
+    let d = new Date(s);
+    return isNaN(d) ? null : new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+}
+
+function iso(d) {
+    let x = new Date(d);
+    x.setUTCDate(x.getUTCDate() + 4 - (x.getUTCDay() || 7));
+    let y = x.getUTCFullYear();
+    return [y, Math.ceil((((x - new Date(Date.UTC(y, 0, 1))) / 86400000) + 1) / 7)]
+}
+
+function dateStr(d) {
+    return d.toISOString().slice(0, 10)
+}
+
+function parseBook(data, name) {
+    let wb = XLSX.read(data, {
+        type: 'array',
+        cellDates: true
+    });
+    let sheet = wb.Sheets[wb.SheetNames.find(x => x.toLowerCase() === (name === 'forecast' ? 'export' : 'sheet')) || wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(sheet, {
+        header: 1,
+        defval: null,
+        raw: true
+    })
+}
+
+function setOptions(id, values, all) {
+    let el = $(id);
+    el.innerHTML = '<option value="">' + all + '</option>' + [...new Set(values.filter(Boolean))].sort().map(x => '<option value="' + esc(x) + '">' + esc(x) + '</option>').join('')
+}
+
+function unique(xs) {
+    return [...new Set(xs.filter(x => x !== null && x !== undefined && String(x).trim() !== '').map(String))].join(' / ')
+}
+
+function build(f, w) {
+    let stocks = new Map(),
+        invalid = 0;
+    for (let i = 1; i < w.length; i++) {
+        let r = w[i];
+        if (!r || r[0] == null || String(r[0]).trim() === '') continue;
+        let key = norm(r[0]);
+        if (!stocks.has(key)) stocks.set(key, []);
+        stocks.get(key).push({
+            revision: String(r[1] ?? '').trim() || 'Brak Revision',
+            d1: r[3] ?? '',
+            d2: r[4] ?? '',
+            pick: r[5] ?? '',
+            buffer: r[6] ?? '',
+            stock: num(r[7]),
+            zone: r[8] ?? '',
+            qty: num(r[10]),
+            buffzone: r[13] ?? '',
+            repl: r[19] ?? ''
+        })
+    }
+    let groups = new Map();
+    for (let i = 1; i < f.length; i++) {
+        let r = f[i];
+        if (!r || r[1] == null || String(r[1]).trim() === '') continue;
+        let dt = excelDate(r[2]),
+            val = num(r[4]);
+        if (!dt || val === null) {
+            invalid++;
+            continue
+        }
+        let [year, week] = iso(dt), month = dt.toISOString().slice(0, 7), key = norm(r[1]), gkey = [key, year, week, month].join('|');
+        if (!groups.has(gkey)) groups.set(gkey, {
+            article: String(r[1]).trim(),
+            key,
+            year,
+            week,
+            month,
+            dates: new Set(),
+            forecast: 0
+        });
+        let g = groups.get(gkey);
+        g.forecast += val;
+        g.dates.add(dateStr(dt))
+    }
+    let months = new Map(),
+        weekTotals = new Map(),
+        monthTotals = new Map();
+    for (const g of groups.values()) {
+        let k = g.key + '|' + g.month;
+        months.set(k, (months.get(k) || 0) + g.forecast);
+        let wk = g.year + '|' + g.week;
+        weekTotals.set(wk, (weekTotals.get(wk) || 0) + g.forecast);
+        monthTotals.set(g.month, (monthTotals.get(g.month) || 0) + g.forecast)
+    }
+    monthParts = [...groups.values()].map(g => {
+        let suppliers = stocks.get(g.key) || [],
+            stocksValid = suppliers.map(x => x.stock).filter(x => x !== null),
+            stock = stocksValid.length ? stocksValid.reduce((a, b) => a + b, 0) : null;
+        return {
+            ...g,
+            monthly: months.get(g.key + '|' + g.month),
+            weekTotal: weekTotals.get(g.year + '|' + g.week),
+            monthTotal: monthTotals.get(g.month),
+            suppliers,
+            stock,
+            state: !suppliers.length || stock === null ? 'missing' : stock < g.forecast ? 'low' : 'ok'
+        }
+    }).sort((a, b) => a.year - b.year || a.week - b.week || a.month.localeCompare(b.month) || a.article.localeCompare(b.article));
+    let combined = new Map();
+    for (const p of monthParts) {
+        let k = p.key + '|' + p.year + '|' + p.week;
+        if (!combined.has(k)) combined.set(k, {
+            ...p,
+            forecast: 0,
+            dates: new Set(),
+            months: new Set()
+        });
+        let r = combined.get(k);
+        r.forecast += p.forecast;
+        r.months.add(p.month);
+        for (const d of p.dates) r.dates.add(d)
+    }
+    records = [...combined.values()].map(r => {
+        let months = [...r.months].sort();
+        r.month = months.join(' / ');
+        if (months.length > 1) {
+            r.monthly = null;
+            r.monthTotal = null
+        }
+        r.state = r.stock === null ? 'missing' : r.stock < r.forecast ? 'low' : 'ok';
+        return r
+    }).sort((a, b) => a.year - b.year || a.week - b.week || a.article.localeCompare(b.article));
+    return invalid
+}
+
+function apply() {
+    let q = $('search').value.trim().toLowerCase(),
+        week = $('week').value,
+        month = $('month').value,
+        zone = $('zone').value,
+        repl = $('repl').value,
+        state = $('state').value;
+    filtered = records.filter(r => (!q || [r.article, ...r.suppliers.flatMap(s => [s.d1, s.d2, s.revision])].some(x => String(x).toLowerCase().includes(q))) && (!week || `${r.year}-T${String(r.week).padStart(2,'0')}` === week) && (!month || r.months.has(month)) && (!zone || r.suppliers.some(s => String(s.zone) === zone)) && (!repl || r.suppliers.some(s => String(s.repl) === repl)) && (!state || r.state === state));
+    page = 1;
+    render()
+}
+
+function supplierCount(r) {
+    return new Set(r.suppliers.map(s => s.revision).filter(x => x && x !== 'Brak Revision')).size
+}
+
+function averagePallets(r) {
+    let values = r.suppliers.filter(s => s.qty !== null && s.qty > 0).map(s => Math.max(0, r.forecast) / s.qty);
+    return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null
+}
+
+function rowValues(r) {
+    const vals = k => unique(r.suppliers.map(s => s[k]));
+    let avg = averagePallets(r);
+    return [r.article, r.year, r.week, r.month, [...r.dates].sort().join(', '), r.forecast, r.weekTotal ? r.forecast / r.weekTotal * 100 : 0, r.monthly, r.monthTotal ? r.monthly / r.monthTotal * 100 : null, r.stock, r.state === 'low' ? 'Planowana dostawa' : r.state === 'ok' ? 'Stan wystarczający' : 'Brak danych o stanie', supplierCount(r), vals('revision'), vals('d1'), vals('d2'), vals('pick'), vals('buffer'), vals('zone'), vals('buffzone'), vals('repl'), vals('qty'), avg === null ? 'Brak danych' : avg]
+}
+
+function render() {
+    let total = filtered.length,
+        pages = Math.ceil(total / perPage);
+    page = Math.max(1, Math.min(page, pages || 1));
+    $('kRows').textContent = fmt(total);
+    $('kArt').textContent = fmt(new Set(filtered.map(x => x.key)).size);
+    $('kForecast').textContent = fmt(filtered.reduce((a, b) => a + b.forecast, 0));
+    $('kLow').textContent = fmt(filtered.filter(x => x.state === 'low').length);
+    $('kMissing').textContent = fmt(filtered.filter(x => x.state === 'missing').length);
+    $('body').innerHTML = filtered.slice((page - 1) * perPage, page * perPage).map(r => '<tr>' + rowValues(r).map((v, i) => '<td' + (i === 10 && r.state === 'low' ? ' class="warn"' : '') + '>' + esc(v === null ? 'Brak danych' : typeof v === 'number' ? fmt(v) : v || '—') + '</td>').join('') + '</tr>').join('') || '<tr><td colspan="22">Brak wyników dla wybranych filtrów.</td></tr>';
+    $('pageInfo').textContent = `Strona ${pages?page:0} z ${pages} · ${fmt(total)} wierszy`;
+    $('prev').disabled = page <= 1;
+    $('next').disabled = page >= pages;
+    $('export').disabled = !total
+}
+
+function pobierzWzor(typ) {
+    if (typeof XLSX === 'undefined') {
+        $('status').textContent = 'Nie udało się wczytać biblioteki Excel. Sprawdź połączenie internetowe i odśwież stronę.';
+        return
+    }
+    const forecast = typ === 'forecast';
+    const rows = forecast ? [
+        ['CDC_Fcst&Prom[BU]', 'CDC_Fcst&Prom[ItemNo]', 'CDC_Fcst&Prom[*StartDate]', '[SumBase_Demand_Forecast]', '[SumOperational_Forecast]'],
+        ['CDC081', '00028508', new Date(2026, 10, 15), 3.35, 3.35],
+        ['CDC081', '00028508', new Date(2026, 10, 22), 3.51, 3.51]
+    ] : [
+        ['Article', 'Revision', 'Short L62', 'Descr 1', 'Descr 2', 'Pick MHA', 'BufferMHA', 'Avail Balance', 'Pick Zone', 'Pref LdCT', 'Qty in Full StUnit', 'NotAvail Bal', 'Pick MHA Balance', 'Buff Zone', 'HandlingUnit Wght', 'HandlingUnit Length', 'HandlingUnit Width', 'HandlingUnit Height', 'HandlingUnit Qty', 'ustawienie repl'],
+        ['00028508', '19718', 7, 'Przykładowy artykuł', 'Rozmiar A', '11P1', '11N1', 0, 'FL', 'E07', 222, 0, 0, 'E4', 0.155, 334, 71, 71, 1, 'standard'],
+        ['00028508', '22315', 29360, 'Przykładowy artykuł', 'Rozmiar A', '11P1', '11N1', 133, 'FL', 'E07', 200, 0, 4, 'E2', 0.155, 334, 71, 71, 1, 'standard']
+    ];
+    const sheet = XLSX.utils.aoa_to_sheet(rows, {
+        cellDates: true
+    });
+    sheet['!cols'] = rows[0].map(h => ({
+        wch: Math.min(35, Math.max(14, String(h).length + 3))
+    }));
+    if (forecast) {
+        for (const address of ['C2', 'C3'])
+            if (sheet[address]) sheet[address].z = 'yyyy-mm-dd'
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet, forecast ? 'Export' : 'Sheet');
+    XLSX.writeFile(wb, forecast ? 'Wzor_forecast.xlsx' : 'Wzor_stan_magazynu.xlsx');
+}
+$('templateForecast').onclick = () => pobierzWzor('forecast');
+$('templateStock').onclick = () => pobierzWzor('stock');
+$('run').onclick = async () => {
+    if (typeof XLSX === 'undefined') {
+        $('status').textContent = 'Nie udało się wczytać biblioteki Excel. Sprawdź połączenie internetowe i odśwież stronę.';
+        return
+    }
+    let f = $('forecast').files[0],
+        w = $('wsad').files[0];
+    if (!f || !w) {
+        $('status').textContent = 'Wybierz oba pliki.';
+        return
+    }
+    $('run').disabled = true;
+    $('status').textContent = 'Wczytywanie i analiza plików — może potrwać przy dużym forecaście…';
+    await new Promise(r => setTimeout(r, 50));
+    try {
+        let [fb, wb] = await Promise.all([f.arrayBuffer(), w.arrayBuffer()]);
+        let fr = parseBook(fb, 'forecast'),
+            ws = parseBook(wb, 'wsad');
+        if (!fr.length || !ws.length || !String(fr[0][1] ?? '').toLowerCase().includes('itemno') || !String(ws[0][0] ?? '').toLowerCase().includes('article')) throw Error('Nie rozpoznano nagłówków. Sprawdź, czy wybrano właściwe pliki w odpowiednich polach.');
+        let skipped = build(fr, ws);
+        setOptions('week', records.map(r => `${r.year}-T${String(r.week).padStart(2,'0')}`), 'Wszystkie tygodnie');
+        setOptions('month', monthParts.map(r => r.month), 'Wszystkie miesiące');
+        setOptions('zone', records.flatMap(r => r.suppliers.map(s => String(s.zone))), 'Wszystkie strefy');
+        setOptions('repl', records.flatMap(r => r.suppliers.map(s => String(s.repl))), 'Wszystkie ustawienia');
+        $('search').value = '';
+        $('state').value = '';
+        apply();
+        $('status').textContent = `Gotowe: ${fmt(records.length)} wierszy raportu. Pominięte wiersze forecastu z nieprawidłową datą lub wartością: ${fmt(skipped)}.`
+    } catch (e) {
+        $('status').textContent = 'Błąd importu: ' + e.message
+    } finally {
+        $('run').disabled = false
+    }
+};
+['search', 'week', 'month', 'zone', 'repl', 'state'].forEach(id => $(id).addEventListener(id === 'search' ? 'input' : 'change', apply));
+$('reset').onclick = () => {
+    ['search', 'week', 'month', 'zone', 'repl', 'state'].forEach(id => $(id).value = '');
+    apply()
+};
+$('prev').onclick = () => {
+    page--;
+    render()
+};
+$('next').onclick = () => {
+    page++;
+    render()
+};
+$('export').onclick = async () => {
+    if (!filtered.length) return;
+    const button = $('export');
+    button.disabled = true;
+    button.textContent = 'Przygotowywanie pliku...';
+    $('status').textContent = 'Przygotowywanie sześciu arkuszy. Przy dużym raporcie może to potrwać.';
+    await new Promise(resolve => setTimeout(resolve, 50));
+    try {
+        if (typeof XLSX === 'undefined') throw new Error('Biblioteka Excel nie została załadowana.');
+        const wb = XLSX.utils.book_new();
+        const setFormats = (sheet, headers) => {
+            for (let c = 0; c < headers.length; c++) {
+                const isPct = headers[c].includes('Udział') && headers[c].includes('%');
+                const isPallet = headers[c].includes('Średnia palet');
+                if (!isPct && !isPallet) continue;
+                for (let r = 1; r <= ((sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']).e.r : 0)); r++) {
+                    let cell = sheet[XLSX.utils.encode_cell({
+                        r,
+                        c
+                    })];
+                    if (cell && typeof cell.v === 'number') {
+                        if (isPct) cell.v /= 100;
+                        cell.z = isPct ? '0.00%' : '0.0000'
+                    }
+                }
+            }
+        };
+        const makeSheet = async (name, headers, rows) => {
+            const sheet = XLSX.utils.aoa_to_sheet([headers]);
+            for (let start = 0; start < rows.length; start += 2000) {
+                XLSX.utils.sheet_add_aoa(sheet, rows.slice(start, start + 2000).map(r => {
+                    const v = rowValues(r);
+                    return [...v.slice(0, 7), ...v.slice(9)]
+                }), {
+                    origin: -1
+                });
+                if (start % 20000 === 0) {
+                    $('status').textContent = 'Arkusz ' + name + ': ' + fmt(Math.min(start + 2000, rows.length)) + ' / ' + fmt(rows.length);
+                    await new Promise(resolve => setTimeout(resolve, 0))
+                }
+            }
+            setFormats(sheet, headers);
+            XLSX.utils.book_append_sheet(wb, sheet, name);
+        };
+        const weeklyHeaders = [...cols.slice(0, 7), ...cols.slice(9)];
+        await makeSheet('Tygodniowy', weeklyHeaders, filtered);
+        const selected = new Set();
+        for (const r of filtered)
+            for (const month of r.months)
+                if (!$('month').value || $('month').value === month) selected.add(r.key + '|' + month);
+        const monthly = new Map();
+        for (const r of monthParts) {
+            const key = r.key + '|' + r.month;
+            if (!selected.has(key)) continue;
+            if (!monthly.has(key)) monthly.set(key, {
+                ...r,
+                dates: new Set(),
+                forecast: r.monthly,
+                state: r.stock === null ? 'missing' : r.stock < r.monthly ? 'low' : 'ok'
+            });
+            const m = monthly.get(key);
+            for (const d of r.dates) m.dates.add(d)
+        }
+        const monthlyHeaders = ['Artykuł', 'Miesiąc', 'Daty forecastu', 'Forecast miesięczny szt.', 'Udział miesięczny %', 'Stan łączny szt.', 'Status stanu', 'Liczba dostawców', 'Revision', 'Descr 1', 'Descr 2', 'Pick MHA', 'BufferMHA', 'Pick Zone', 'Buff Zone', 'Ustawienie REPL', 'Szt. na palecie', 'Średnia palet miesięczna'];
+        const monthlyRows = [...monthly.values()];
+        const sheet = XLSX.utils.aoa_to_sheet([monthlyHeaders]);
+        for (let start = 0; start < monthlyRows.length; start += 2000) {
+            const rows = monthlyRows.slice(start, start + 2000).map(r => {
+                const v = rowValues(r);
+                return [v[0], v[3], v[4], v[7], v[8], ...v.slice(9)]
+            });
+            XLSX.utils.sheet_add_aoa(sheet, rows, {
+                origin: -1
+            });
+            if (start % 20000 === 0) {
+                $('status').textContent = 'Arkusz miesięczny: ' + fmt(Math.min(start + 2000, monthlyRows.length)) + ' / ' + fmt(monthlyRows.length);
+                await new Promise(resolve => setTimeout(resolve, 0))
+            }
+        }
+        setFormats(sheet, monthlyHeaders);
+        XLSX.utils.book_append_sheet(wb, sheet, 'Miesięczny');
+        const rankSheet = async (name, rows, isMonth) => {
+            const ranked = rows.slice().sort((a, b) => isMonth ? a.month.localeCompare(b.month) || b.forecast - a.forecast || a.article.localeCompare(b.article) : a.year - b.year || a.week - b.week || b.forecast - a.forecast || a.article.localeCompare(b.article));
+            const header = isMonth ? ['Miesiąc', 'Miejsce', 'Artykuł', 'Descr 1', 'Forecast miesięczny szt.', 'Udział miesięczny %', 'Średnia palet', 'Stan łączny szt.', 'Status stanu', 'Ustawienie REPL', 'Szt. na palecie'] : ['Rok ISO', 'Tydzień ISO', 'Miejsce', 'Artykuł', 'Descr 1', 'Forecast tygodniowy szt.', 'Udział tygodniowy %', 'Średnia palet', 'Stan łączny szt.', 'Status stanu', 'Ustawienie REPL', 'Szt. na palecie'];
+            const sh = XLSX.utils.aoa_to_sheet([header]);
+            let last = '',
+                place = 0;
+            for (let start = 0; start < ranked.length; start += 2000) {
+                let batch = [];
+                for (const r of ranked.slice(start, start + 2000)) {
+                    let period = isMonth ? r.month : r.year + '|' + r.week;
+                    if (period !== last) {
+                        place = 0;
+                        last = period
+                    }
+                    place++;
+                    let share = isMonth ? (r.monthTotal ? r.forecast / r.monthTotal * 100 : null) : (r.weekTotal ? r.forecast / r.weekTotal * 100 : null),
+                        avg = averagePallets(r),
+                        status = r.state === 'low' ? 'Planowana dostawa' : r.state === 'ok' ? 'Stan wystarczający' : 'Brak danych o stanie';
+                    let common = [place, r.article, unique(r.suppliers.map(s => s.d1)), r.forecast, share, avg, r.stock, status, unique(r.suppliers.map(s => s.repl)), unique(r.suppliers.map(s => s.qty))];
+                    batch.push(isMonth ? [r.month, ...common] : [r.year, r.week, ...common])
+                }
+                XLSX.utils.sheet_add_aoa(sh, batch, {
+                    origin: -1
+                });
+                if (start % 20000 === 0) await new Promise(resolve => setTimeout(resolve, 0))
+            }
+            setFormats(sh, header);
+            XLSX.utils.book_append_sheet(wb, sh, name);
+        };
+        await rankSheet('Top tygodniowy', filtered, false);
+        await rankSheet('Top miesięczny', monthlyRows, true);
+        const paretoSheet = (name, rows, isMonth) => {
+            const byPeriod = new Map();
+            for (const r of rows) {
+                const k = isMonth ? r.month : r.year + '|' + String(r.week).padStart(2, '0');
+                if (!byPeriod.has(k)) byPeriod.set(k, []);
+                byPeriod.get(k).push(r)
+            }
+            const headers = [...(isMonth ? ['Miesiąc'] : ['Rok ISO', 'Tydzień ISO']), 'Forecast całego okresu szt.', 'Artykuły w wynikach', 'Forecast widocznych artykułów szt.', 'Udział widocznych artykułów %', 'TOP 10 artykułów szt.', 'Udział TOP 10 %', 'TOP 20 artykułów szt.', 'Udział TOP 20 %', 'TOP 50 artykułów szt.', 'Udział TOP 50 %', 'Liczba artykułów do 80%', 'Szt. osiągające 80%', 'Udział do progu 80% %'];
+            const data = [headers];
+            for (const [period, items] of [...byPeriod.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+                items.sort((a, b) => b.forecast - a.forecast || a.article.localeCompare(b.article));
+                const total = isMonth ? items[0].monthTotal : items[0].weekTotal;
+                const sum = arr => arr.reduce((a, x) => a + x.forecast, 0);
+                const selectedTotal = sum(items);
+                const share = x => total > 0 ? x / total * 100 : null;
+                let accumulated = 0,
+                    count = 0;
+                for (const item of items) {
+                    if (total > 0 && accumulated >= total * 0.8) break;
+                    accumulated += item.forecast;
+                    count++
+                }
+                const reached = total > 0 && accumulated >= total * 0.8;
+                const t10 = sum(items.slice(0, 10)),
+                    t20 = sum(items.slice(0, 20)),
+                    t50 = sum(items.slice(0, 50));
+                data.push([...(isMonth ? [period] : period.split('|').map(Number)), total, items.length, selectedTotal, share(selectedTotal), t10, share(t10), t20, share(t20), t50, share(t50), reached ? count : 'Nieosiągnięte', reached ? accumulated : null, reached ? share(accumulated) : null]);
+            }
+            const sh = XLSX.utils.aoa_to_sheet(data);
+            setFormats(sh, headers);
+            XLSX.utils.book_append_sheet(wb, sh, name);
+        };
+        paretoSheet('Pareto tygodniowe', filtered, false);
+        paretoSheet('Pareto miesięczne', monthlyRows, true);
+
+        XLSX.writeFile(wb, 'Raport_forecast_v7.xlsx', {
+            compression: true
+        });
+        $('status').textContent = 'Eksport gotowy: arkusz tygodniowy ' + fmt(filtered.length) + ' wierszy, miesięczny ' + fmt(monthlyRows.length) + ' wierszy.';
+    } catch (e) {
+        console.error(e);
+        $('status').textContent = 'Nie udało się wyeksportować raportu: ' + e.message + '. Spróbuj wybrać mniej tygodni.'
+    } finally {
+        button.disabled = !filtered.length;
+        button.textContent = 'Eksportuj do Excel'
+    }
+};
+
+  </script>
+ </body>
+</html>
